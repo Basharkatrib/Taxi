@@ -371,20 +371,77 @@
     const hour = when.getHours();
     const minutes = when.getMinutes();
     const msg = encodeURIComponent(`موعد إيصال: ${app.name}`);
-    // صيغة intent القياسية لفتح تطبيق الساعة مع إعداد ساعة منبّه
-    const intentUrl =
-      `intent:#Intent;` +
-      `action=android.intent.action.SET_ALARM;` +
-      `S.android.intent.extra.alarm.MESSAGE=${msg};` +
-      `i.android.intent.extra.alarm.HOUR=${hour};` +
-      `i.android.intent.extra.alarm.MINUTES=${minutes};` +
-      `B.android.intent.extra.alarm.SKIP_UI=false;` +
-      `end`;
-    try {
-      window.location.href = intentUrl;
-    } catch {
-      alert('تعذر فتح تطبيق الساعة. يرجى إنشاء منبّه يدويًا.');
-    }
+
+    const buildIntent = (pkg) => {
+      return (
+        `intent:#Intent;` +
+        `action=android.intent.action.SET_ALARM;` +
+        `S.android.intent.extra.alarm.MESSAGE=${msg};` +
+        `i.android.intent.extra.alarm.HOUR=${hour};` +
+        `i.android.intent.extra.alarm.MINUTES=${minutes};` +
+        `B.android.intent.extra.alarm.SKIP_UI=false;` +
+        (pkg ? `package=${pkg};` : '') +
+        `end`
+      );
+    };
+
+    // نحاول جوجل ديسك لوك، ثم سامسونج، ثم عامة
+    const intents = [
+      buildIntent('com.google.android.deskclock'),
+      buildIntent('com.sec.android.app.clockpackage'),
+      buildIntent('')
+    ];
+
+    tryIntentsSequentially(intents, 900).catch(() => {
+      alert('تعذر فتح تطبيق الساعة تلقائيًا. اضغط زر "منبّه الساعة (أندرويد)" لفتحه يدويًا.');
+    });
+  }
+
+  function tryIntentsSequentially(intentUrls, timeoutPerTryMs) {
+    return new Promise((resolve, reject) => {
+      let idx = 0;
+      const tryNext = () => {
+        if (idx >= intentUrls.length) {
+          reject(new Error('no-intent-worked'));
+          return;
+        }
+        const url = intentUrls[idx++];
+        tryOpenIntent(url, timeoutPerTryMs).then((ok) => {
+          if (ok) {
+            resolve(true);
+          } else {
+            tryNext();
+          }
+        }).catch(() => tryNext());
+      };
+      tryNext();
+    });
+  }
+
+  function tryOpenIntent(url, timeoutMs) {
+    return new Promise((resolve) => {
+      let done = false;
+      const onHidden = () => {
+        if (!done && document.visibilityState === 'hidden') {
+          done = true;
+          cleanup();
+          resolve(true);
+        }
+      };
+      const cleanup = () => {
+        document.removeEventListener('visibilitychange', onHidden, true);
+      };
+      document.addEventListener('visibilitychange', onHidden, true);
+      // افتح الـ intent ضمن نفس جِلسة التفاعل
+      window.location.href = url;
+      setTimeout(() => {
+        if (!done) {
+          done = true;
+          cleanup();
+          resolve(false);
+        }
+      }, timeoutMs || 800);
+    });
   }
 
   function openGoogleCalendarImmediate(app) {
