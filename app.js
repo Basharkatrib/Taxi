@@ -123,6 +123,8 @@
       renderAppointments();
     } else if (action === 'ics') {
       addToCalendar(item);
+    } else if (action === 'alarm') {
+      openAndroidAlarm(item);
     }
   }
 
@@ -241,21 +243,58 @@
 
   function addToCalendar(app) {
     const start = new Date(app.startISO);
-    const ics = buildIcs({
+    const icsContent = buildIcs({
       title: `إيصال: ${app.name}`,
       notes: app.notes || '',
       startDate: start
     });
-    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const fileNameDate = app.startISO.slice(0, 16).replace(/[:T]/g, '-');
+    const fileName = `موعد-${sanitizeFilePart(app.name)}-${fileNameDate}.ics`;
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const datePart = app.startISO.slice(0, 16).replace(/[:T]/g, '-');
-    a.download = `موعد-${sanitizeFilePart(app.name)}-${datePart}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+    // iOS Safari usually opens .ics directly in التقويم عند فتح الرابط
+    if (isIOS()) {
+      window.location.href = url;
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      return;
+    }
+
+    // Android: حاول المشاركة عبر نظام المشاركة (قد يفتح تطبيق تقويم يدعم .ics مثل Samsung Calendar)
+    const file = new File([icsContent], fileName, { type: 'text/calendar' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({
+        files: [file],
+        title: 'إضافة موعد إلى التقويم',
+        text: `إضافة موعد: ${app.name}`
+      }).catch(() => {
+        // تجاهل إلغاء المشاركة
+      }).finally(() => {
+        URL.revokeObjectURL(url);
+      });
+      return;
+    }
+
+    // كخيار موثوق على أندرويد (Google Calendar لا يدعم فتح .ics مباشرة): افتح نموذج إضافة حدث
+    const gcalUrl = buildGoogleCalendarUrl({
+      title: `إيصال: ${app.name}`,
+      notes: app.notes || '',
+      startDate: start
+    });
+    const opened = window.open(gcalUrl, '_blank');
+    if (!opened) {
+      // fallback أخير: نزّل الملف واطلب من المستخدم فتحه يدويًا
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      alert('تم تنزيل ملف التقويم .ics. افتح الملف من التنزيلات لإضافته إلى التقويم.');
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } else {
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
   }
 
   function buildIcs({ title, notes, startDate }) {
@@ -277,13 +316,71 @@
       `DESCRIPTION:${escapeIcs(notes)}`,
       'BEGIN:VALARM',
       'TRIGGER:-PT10M',
-      'ACTION:AUDIO',
-      'DESCRIPTION:Reminder',
+      'ACTION:DISPLAY',
+      'DESCRIPTION:Reminder - 10 minutes before',
       'END:VALARM',
       'END:VEVENT',
       'END:VCALENDAR'
     ];
     return lines.join('\r\n');
+  }
+
+  function buildGoogleCalendarUrl({ title, notes, startDate }) {
+    // استخدم UTC مع ctz لعرضه حسب المنطقة
+    const startUtc = toIcsUtc(startDate).replace('Z', '');
+    const endUtc = toIcsUtc(new Date(startDate.getTime() + 60 * 60 * 1000)).replace('Z', '');
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'UTC';
+    const base = 'https://calendar.google.com/calendar/render';
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: title,
+      details: notes,
+      dates: `${startUtc}Z/${endUtc}Z`,
+      ctz: tz
+    });
+    return `${base}?${params.toString()}`;
+  }
+
+  function isIOS() {
+    const ua = navigator.userAgent || navigator.vendor || '';
+    const iOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    return iOS;
+  }
+
+  function isAndroid() {
+    const ua = navigator.userAgent || '';
+    return /Android/i.test(ua);
+  }
+
+  function openAndroidAlarm(app) {
+    if (!isAndroid()) {
+      alert('زر المنبّه يعمل على أجهزة أندرويد فقط.');
+      return;
+    }
+    // اجعل المنبّه قبل 10 دقائق من الموعد
+    let when = new Date(new Date(app.startISO).getTime() - 10 * 60 * 1000);
+    const now = new Date();
+    if (when.getTime() <= now.getTime()) {
+      // إذا فات الوقت، اضبطه بعد دقيقتين من الآن لتجربة المنبّه بسرعة
+      when = new Date(now.getTime() + 2 * 60 * 1000);
+    }
+    const hour = when.getHours();
+    const minutes = when.getMinutes();
+    const msg = encodeURIComponent(`موعد إيصال: ${app.name}`);
+    // صيغة intent القياسية لفتح تطبيق الساعة مع إعداد ساعة منبّه
+    const intentUrl =
+      `intent:#Intent;` +
+      `action=android.intent.action.SET_ALARM;` +
+      `S.android.intent.extra.alarm.MESSAGE=${msg};` +
+      `i.android.intent.extra.alarm.HOUR=${hour};` +
+      `i.android.intent.extra.alarm.MINUTES=${minutes};` +
+      `B.android.intent.extra.alarm.SKIP_UI=false;` +
+      `end`;
+    try {
+      window.location.href = intentUrl;
+    } catch {
+      alert('تعذر فتح تطبيق الساعة. يرجى إنشاء منبّه يدويًا.');
+    }
   }
 
   function toIcsUtc(date) {
