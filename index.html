@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0e7490">
+  <title>مواعيد السائق</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon-192.svg" sizes="192x192" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/icon-192.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1>مواعيد السائق</h1>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>إضافة موعد</h2>
+      <form id="appointmentForm" class="form">
+        <div class="form-row">
+          <label for="customerName">اسم الزبون</label>
+          <input id="customerName" name="customerName" type="text" required placeholder="مثال: أحمد علي">
+        </div>
+        <div class="form-row">
+          <label for="appointmentTime">الوقت والتاريخ</label>
+          <input id="appointmentTime" name="appointmentTime" type="datetime-local" required>
+        </div>
+        <div class="form-row">
+          <label for="notes">ملاحظات</label>
+          <textarea id="notes" name="notes" rows="3" placeholder="مثال: نقطة الالتقاء عند البوابة الشمالية"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn primary">إضافة الموعد</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>إعدادات التنبيه</h2>
+      <div class="settings">
+        <button id="enableSoundBtn" class="btn">تفعيل الصوت داخل التطبيق</button>
+        <button id="enableNotifBtn" class="btn">تفعيل الإشعارات</button>
+        <p class="hint">
+          للتأكد من الرنين حتى لو التطبيق مغلق، استخدم زر “أضف إلى التقويم” لكل موعد.
+        </p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="list-header">
+        <h2>مواعيد اليوم</h2>
+        <button id="clearAllBtn" class="btn danger">مسح جميع المواعيد</button>
+      </div>
+      <ul id="appointmentsList" class="list"></ul>
+      <template id="appointmentItemTpl">
+        <li class="list-item">
+          <div class="meta">
+            <div class="title"></div>
+            <div class="sub"></div>
+          </div>
+          <div class="actions">
+            <button class="btn" data-action="ics">أضف إلى التقويم</button>
+            <button class="btn danger" data-action="delete">حذف</button>
+          </div>
+        </li>
+      </template>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <small>يعمل أوفلاين — ثبّت التطبيق من إعدادات المتصفح</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+<style id="rtl-inlines"></style>
+</html>
+
+
