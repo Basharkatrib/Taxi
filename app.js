@@ -95,8 +95,10 @@
       startISO: startDate.toISOString(),
       notes
     };
-    // افتح نموذج إنشاء حدث في Google Calendar فورًا (خيارك المفضل)
-    openGoogleCalendarImmediate(appointment);
+    // تشغيل وضع أوفلاين بالكامل: على أندرويد افتح منبّه الساعة تلقائيًا
+    if (isAndroid()) {
+      openAndroidAlarm(appointment);
+    }
     const list = readAppointments();
     list.push(appointment);
     list.sort((a, b) => new Date(a.startISO) - new Date(b.startISO));
