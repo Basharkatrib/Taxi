@@ -95,6 +95,8 @@
       startISO: startDate.toISOString(),
       notes
     };
+    // افتح نموذج إنشاء حدث في Google Calendar فورًا (خيارك المفضل)
+    openGoogleCalendarImmediate(appointment);
     const list = readAppointments();
     list.push(appointment);
     list.sort((a, b) => new Date(a.startISO) - new Date(b.startISO));
@@ -380,6 +382,24 @@
       window.location.href = intentUrl;
     } catch {
       alert('تعذر فتح تطبيق الساعة. يرجى إنشاء منبّه يدويًا.');
+    }
+  }
+
+  function openGoogleCalendarImmediate(app) {
+    try {
+      const url = buildGoogleCalendarUrl({
+        title: `إيصال: ${app.name}`,
+        notes: app.notes || '',
+        startDate: new Date(app.startISO)
+      });
+      // فتح في تبويب جديد ضمن نفس حدث الضغط لتجنّب حظر النوافذ المنبثقة
+      const w = window.open(url, '_blank');
+      if (!w) {
+        // إذا تم الحظر، افتح في نفس التبويب كحل أخير
+        window.location.href = url;
+      }
+    } catch {
+      // تجاهل
     }
   }
 
