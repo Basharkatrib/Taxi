@@ -1,5 +1,5 @@
 /* cache-first service worker */
-const CACHE_NAME = 'taxi-pwa-cache-v1';
+const CACHE_NAME = 'taxi-pwa-cache-v2';
 const ASSETS = [
   './',
   './index.html',
